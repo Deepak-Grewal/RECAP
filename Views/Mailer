@@ -1,0 +1,292 @@
+// Required Namespaces
+using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Net.Mail;
+using Microsoft.SqlServer.Dts.Runtime;
+using System.Text;
+using System.Collections.Generic;
+
+[Microsoft.SqlServer.Dts.Tasks.ScriptTask.SSISScriptTaskEntryPointAttribute]
+public partial class ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase
+{
+    public void Main()
+    {
+        string connStr = "Data Source=localhost;Initial Catalog=HRMailer;Integrated Security=SSPI;"; // Or use SQL Auth
+        DataTable dt = new DataTable();
+
+        using (SqlConnection conn = new SqlConnection(connStr))
+        {
+            conn.Open();
+
+            string query = @"
+                SELECT FullName, Email, DateOfBirth, DateOfJoining
+                FROM Employees
+                WHERE (MONTH(DateOfBirth) = MONTH(GETDATE()) AND DAY(DateOfBirth) = DAY(GETDATE()))
+                   OR (MONTH(DateOfJoining) = MONTH(GETDATE()) AND DAY(DateOfJoining) = DAY(GETDATE()))";
+
+            using (SqlCommand cmd = new SqlCommand(query, conn))
+            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+            {
+                da.Fill(dt);
+            }
+        }
+
+        var birthdays = new List<string>();
+        var anniversaries = new List<string>();
+        var today = DateTime.Today;
+
+        foreach (DataRow row in dt.Rows)
+        {
+            var name = row["FullName"].ToString();
+            var email = row["Email"].ToString();
+            DateTime dob = Convert.ToDateTime(row["DateOfBirth"]);
+            DateTime doj = Convert.ToDateTime(row["DateOfJoining"]);
+
+            if (dob.Day == today.Day && dob.Month == today.Month)
+            {
+                birthdays.Add(name);
+            }
+
+            if (doj.Day == today.Day && doj.Month == today.Month)
+            {
+                int years = today.Year - doj.Year;
+                anniversaries.Add($"{name} - {years} years");
+            }
+        }
+
+        if (birthdays.Count > 0)
+            SendMail("🎉 Birthday Wishes", GetBirthdayHtml(birthdays));
+
+        if (anniversaries.Count > 0)
+            SendMail("🏆 Work Anniversary Wishes", GetAnniversaryHtml(anniversaries));
+
+        Dts.TaskResult = (int)ScriptResults.Success;
+    }
+
+    private string GetBirthdayHtml(List<string> names)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div style='font-family:Arial;padding:20px;'>");
+        sb.Append("<h2 style='color:#0072C6;'>🎉 Happy Birthday!</h2>");
+        sb.Append("<p>Wishing a very happy birthday to:</p>");
+        foreach (var name in names)
+            sb.Append($"<p>🎂 {name}</p>");
+        sb.Append("<p>Hope you all have a wonderful day!</p>");
+        sb.Append("<p>- Team HR</p>");
+        sb.Append("</div>");
+        return sb.ToString();
+    }
+
+    private string GetAnniversaryHtml(List<string> messages)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div style='font-family:Arial;padding:20px;'>");
+        sb.Append("<h2 style='color:#0072C6;'>🎉 Work Anniversary!</h2>");
+        sb.Append("<p>Congratulations to the following colleagues:</p>");
+        foreach (var msg in messages)
+            sb.Append($"<p>🏆 {msg}</p>");
+        sb.Append("<p>Thank you for your continued dedication!</p>");
+        sb.Append("<p>- Team HR</p>");
+        sb.Append("</div>");
+        return sb.ToString();
+    }
+
+    private void SendMail(string subject, string htmlBody)
+    {
+        MailMessage mail = new MailMessage();
+        mail.From = new MailAddress("hr@yourdomain.com");
+        mail.To.Add("all.employees@yourdomain.com");
+        mail.Subject = subject;
+        mail.Body = htmlBody;
+        mail.IsBodyHtml = true;
+
+        SmtpClient smtp = new SmtpClient("smtp.yourdomain.com");
+        smtp.Port = 587;
+        smtp.Credentials = new System.Net.NetworkCredential("hr@yourdomain.com", "yourpassword");
+        smtp.EnableSsl = true;
+        smtp.Send(mail);
+    }
+
+    enum ScriptResults
+    {
+        Success = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,
+        Failure = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure
+    }
+}
+
+
+
+ The full SSIS Script Task code is now updated and complete. It includes:
+
+SQL Server data extraction
+
+Filtering for birthdays and anniversaries
+
+Generating professional HTML content
+
+Sending combined emails (one for all birthdays, one for all anniversaries)
+
+If you’d like, I can now help you:
+
+Set SMTP credentials via SSIS variables
+
+Log emails sent to a file or table
+
+Create the SQL Agent job to run this daily
+
+
+
+CREATE TABLE Employees (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    FullName NVARCHAR(100),
+    Email NVARCHAR(100),
+    DateOfBirth DATE,
+    DateOfJoining DATE
+);
+
+
+
+
+
+//temnplate for the Employees table creation
+
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: "Calibri", sans-serif;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      border-left: 4px solid #0072ce;
+      border-right: 4px solid #0072ce;
+      margin: 30px auto;
+      padding: 40px 20px;
+      max-width: 700px;
+      color: #003366;
+    }
+    .logo {
+      text-align: left;
+      margin-bottom: 30px;
+    }
+    .logo img {
+      height: 30px;
+    }
+    .header {
+      text-align: center;
+      font-size: 32px;
+      font-weight: bold;
+      color: #0072ce;
+      margin-bottom: 30px;
+    }
+    .content {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 14px;
+    }
+    .footer-note {
+      font-size: 12px;
+      color: #666666;
+      margin-top: 40px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://upload.wikimedia.org/wikipedia/en/thumb/6/68/Barclays_logo.svg/320px-Barclays_logo.svg.png" alt="Barclays Logo">
+    </div>
+    <div class="header">CONGRATULATIONS</div>
+    <div class="content">
+      Hi Harleen Kaur Sachdeva,<br><br>
+      Many congratulations on completing <strong>6 years</strong> with Barclays. 
+      Wish you many more successful years ahead.
+    </div>
+    <div class="footer">
+      <br>Team HR
+    </div>
+    <div class="footer-note">Restricted – Internal</div>
+  </div>
+</body>
+</html>
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: "Calibri", sans-serif;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      border-left: 4px solid #0072ce;
+      border-right: 4px solid #0072ce;
+      margin: 30px auto;
+      padding: 40px 20px;
+      max-width: 700px;
+      color: #003366;
+    }
+    .logo {
+      text-align: left;
+      margin-bottom: 30px;
+    }
+    .logo img {
+      height: 30px;
+    }
+    .header {
+      text-align: center;
+      font-size: 32px;
+      font-weight: bold;
+      color: #0072ce;
+      margin-bottom: 30px;
+    }
+    .content {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 14px;
+    }
+    .footer-note {
+      font-size: 12px;
+      color: #666666;
+      margin-top: 40px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://upload.wikimedia.org/wikipedia/en/thumb/6/68/Barclays_logo.svg/320px-Barclays_logo.svg.png" alt="Barclays Logo">
+    </div>
+    <div class="header">HAPPY BIRTHDAY</div>
+    <div class="content">
+      Let's wish a very Happy Birthday to:<br><br>
+      🎉 Alice Smith<br>
+      🎉 John Carter<br>
+      🎉 Priya Mehta<br><br>
+      Wishing you all a joyful day and a wonderful year ahead!
+    </div>
+    <div class="footer">
+      <br>Team HR
+    </div>
+    <div class="footer-note">Restricted – Internal</div>
+  </div>
+</body>
+</html>
